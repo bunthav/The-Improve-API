@@ -11,6 +11,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "axios": "^1.8.4",
+    "bcrypt": "^5.1.1",
+    "ejs": "^3.1.10",
     "express": "^4.21.2",
     "myprojectapi": "file:",
     "pg": "^8.14.1"

@@ -1,0 +1,9 @@
+<form method="post">
+    <% if (message) { %>
+        <p><%= message %></p>   
+    <% } %>
+    <input type="text" name="username" placeholder="Name" required>
+    <input type="password" name="userpws" placeholder="Password" required>
+    <button type="submit" formaction="/adduser">register</button>
+    <button type="submit" formaction="/userlogin">login</button>
+</form>

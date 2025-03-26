@@ -3,12 +3,14 @@ import { dirname } from "path";
 import { fileURLToPath } from "url";
 import bodyParser from "body-parser";
 import pg from 'pg';
+import bcrypt from 'bcrypt';
 import { error } from "console";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = 3011;
 app.use(express.json()); // Middleware to parse JSON requests
+const saltOrRounds = 10;
 
 // Create a new PostgreSQL client
 const db = new pg.Client({
@@ -30,7 +32,7 @@ db.connect((err) => {
 // Middleware to parse URL-encoded data from POST requests
 app.use(bodyParser.urlencoded({ extended: true }));
 
-//to Access http://localhost:3011/random
+//to use http://localhost:3011/random
 app.get('/random/', async (req, res)=>{
     // const randomJoke = jokes[Math.round(Math.random() * jokes.length)];
     // res.json(randomJoke);
@@ -50,7 +52,7 @@ app.get('/random/', async (req, res)=>{
     }
 });
 
-//to Access http://localhost:3011/getjoke/?id=2
+//to use http://localhost:3011/getjoke/?id=2
 app.get('/getjoke/', async (req, res) => {
     const getId = parseInt(req.query.id);
     if (isNaN(getId)) {
@@ -99,7 +101,8 @@ app.get('/getjoke/', async (req, res) => {
 //     }
 // });
 
-
+//to use http://localhost:3011/addjoke
+//in body required jokeText , jokeType
 app.post("/addjoke", async (req, res) => {
     const { jokeText, jokeType } = req.body;
 
@@ -121,6 +124,8 @@ app.post("/addjoke", async (req, res) => {
     }
 });
 
+//to use http://localhost:3011/updatejoke
+//in body required jokeid, jokeText , jokeType
 app.patch('/updatejoke/', async (req,res)=>{
     const {jokeid, jokeText, jokeType} = req.body;
     if(!jokeid || !jokeText || !jokeType){
@@ -149,9 +154,9 @@ app.patch('/updatejoke/', async (req,res)=>{
 //         return res.status(400).json({ error: "Input invalid!" });
 //     }
 //     try {
-//         const query = `UPDATE tbjokes 
-//                SET jokeText = $1, jokeType = $2 
-//                WHERE jokeid = $3 
+//         const query = `UPDATE tbjokes
+//                SET jokeText = $1, jokeType = $2
+//                WHERE jokeid = $3
 //                RETURNING *;`;
 //         const updatejoke = await db.query(query, [jokeText, jokeType, jokeid]);
 //         if (updatejoke.rows.length === 0) {
@@ -167,7 +172,8 @@ app.patch('/updatejoke/', async (req,res)=>{
 // Start server
 
 
-// delete
+//to use http://localhost:3011/deletejoke
+//in body required jokeid
 app.delete('/deletejoke/', async (req, res)=>{
     const jokeid = req.body.jokeid;
     if(!jokeid){
@@ -186,6 +192,77 @@ app.delete('/deletejoke/', async (req, res)=>{
     }
 }); 
 
+//to use http://localhost:3011/adduser
+//in body required username and userpws
+app.post('/adduser/', async (req, res) => {
+    const {username, userpws} = req.body;
+    if(!username || !userpws){
+        res.status(400).json({message:"Please fill the input!"});
+    }
+    try{
+        bcrypt.hash(userpws, saltOrRounds, async (err, hash)=>{
+            if(err){
+                return res.status(500).json({error: "Can't hash:", err})
+            }
+            const query = `
+            INSERT INTO tbuser (username, userpws) VALUES ($1,$2) RETURNING *
+            `;
+            const adduser = await db.query(query,[username,hash]);
+            if(adduser.rows.length === 0){
+                return res.status(500).json({error: "hash error!"});
+            }
+            res.status(200).json({message: adduser.rows[0]});
+        });
+    }catch(err){
+        console.error({error: "internal error:", err});
+        res.status(500).json({error: "can't add user!"});
+    };
+
+    // this is the other way to do it;
+    // try {
+    //     const hash = await bcrypt.hash(userpws, saltOrRounds);
+    //     const query = `
+    //     INSERT INTO tbuser (username, userpws) VALUES ($1, $2) RETURNING *;
+    // `;
+    //     const adduser = await db.query(query, [username, hash]);
+
+    //     if (adduser.rows.length === 0) {
+    //         return res.status(500).json({ error: "Error inserting user" });
+    //     }
+
+    //     res.status(200).json({ message: adduser.rows[0] });
+    // } catch (err) {
+    //     console.error("Error during user creation:", err);
+    //     res.status(500).json({ error: "Internal server error" });
+    // }
+
+});
+
+app.post('/userlogin/', async(req,res)=>{
+    const {username, userpws} = req.body;
+    if (!username || !userpws) {
+        return res.status(400).json({ message: "Please fill the input!" });
+    }
+    try{
+        const query = `SELECT * FROM tbuser WHERE username = $1`;
+        const getuser = await db.query(query, [username]);
+
+        if(getuser.rows.length === 0){
+            return res.status(500).json({error: "can connect to table!"});
+        }
+        const user = getuser.rows[0];
+        
+        const match = await bcrypt.compare(userpws, user.userpws);
+        if (match) {
+            return res.status(200).json({ message: `Welcome, ${user.username}!` });
+        } else {
+            return res.status(401).json({ error: "Incorrect username or password!" });
+        }
+    } catch (err) {
+        console.error("Internal error during login:", err);
+        return res.status(500).json({ error: "Internal server error!" });
+    }
+});
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
