@@ -1,8 +1,6 @@
 import express from "express";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
-import bodyParser from "body-parser";
-import { error } from "console";
 import axios from "axios";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
